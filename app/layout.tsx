@@ -74,7 +74,7 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: 'your-google-verification-code', // If you have one
+    google: 'your-google-verification-code',
   },
   category: 'cryptocurrency',
 };
