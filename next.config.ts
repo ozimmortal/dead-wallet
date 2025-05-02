@@ -1,17 +1,4 @@
-const cspHeader = `
-    default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline';
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' blob: data:;
-    font-src 'self';
-    object-src 'none';
-    base-uri 'self';
-    form-action 'self';
-    frame-ancestors 'none';
-    upgrade-insecure-requests;
-`
- 
-module.exports = {
+const nextConfig = {
   async headers() {
     return [
       {
@@ -19,10 +6,19 @@ module.exports = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: cspHeader.replace(/\n/g, ''),
-          },
-        ],
-      },
+            value: `
+              default-src 'self';
+              frame-src https://nowpayments.io;
+              script-src 'self' https://nowpayments.io;
+              style-src 'self' 'unsafe-inline';
+              img-src 'self' https://*.nowpayments.io data:;
+              connect-src 'self' https://api.nowpayments.io;
+            `.replace(/\s{2,}/g, ' ').trim()
+          }
+        ]
+      }
     ]
-  },
+  }
 }
+
+module.exports = nextConfig
