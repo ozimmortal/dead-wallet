@@ -12,18 +12,6 @@ const cspHeader = `
 `
  
 module.exports = {
-  // Required for Cloudflare Pages
-  output: 'export',
-  
-  // If you need Edge runtime for API routes
-  experimental: {
-    runtime: 'edge'
-  },
-  
-  // Disable Vercel-specific image optimization
-  images: {
-    unoptimized: true
-  },
   async headers() {
     return [
       {

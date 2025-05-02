@@ -155,5 +155,3 @@ const parseWallet = async (w: string): Promise<WalletStatus | Error> => {
       }
     }
   };
-  
-export const runtime = "edge";
