@@ -19,6 +19,9 @@ import {
   X,
   Info,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -56,6 +59,10 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
   const [showFilters, setShowFilters] = useState(false)
   const isMobile = useMediaQuery("(max-width: 768px)")
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const transactionsPerPage = 10
+
   // Format timestamp to readable date
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString("en-US", {
@@ -67,17 +74,6 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
     })
   }
 
-  // Shorten signature for display
-  /*
-  const shortenSignature = (sig: string) => {
-    return `${sig.slice(0, 6)}...${sig.slice(-6)}`
-  } 
-
-  // Shorten address for display
-  const shortenAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-6)}`
-  }
-  */
   // Determine transaction direction
   const getTransactionDirection = (tx: Transaction) => {
     return tx.description.includes(`to ${walletAddress}`) ? "in" : "out"
@@ -132,6 +128,21 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
     return result
   }, [transactions, sortField, sortDirection, typeFilter, searchQuery])
 
+  // Calculate pagination
+  const totalPages = Math.ceil(processedTransactions.length / transactionsPerPage)
+
+  // Get current page transactions
+  const currentTransactions = useMemo(() => {
+    const indexOfLastTx = currentPage * transactionsPerPage
+    const indexOfFirstTx = indexOfLastTx - transactionsPerPage
+    return processedTransactions.slice(indexOfFirstTx, indexOfLastTx)
+  }, [processedTransactions, currentPage, transactionsPerPage])
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [typeFilter, searchQuery, sortField, sortDirection])
+
   // Toggle sort direction
   const toggleSortDirection = (field: SortField) => {
     if (sortField === field) {
@@ -153,10 +164,17 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
     setSearchQuery("")
   }
 
-  // Auto-close expanded transaction when changing filters
+  // Auto-close expanded transaction when changing filters or page
   useEffect(() => {
     setExpandedTx(null)
-  }, [typeFilter, searchQuery, sortField, sortDirection])
+  }, [typeFilter, searchQuery, sortField, sortDirection, currentPage])
+
+  // Pagination controls
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+    }
+  }
 
   // Get transaction status badge
   const getStatusBadge = (tx: Transaction) => {
@@ -175,6 +193,103 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
         </Badge>
       )
     }
+  }
+
+  // Generate pagination buttons
+  const renderPaginationButtons = () => {
+    const buttons = []
+    const maxButtonsToShow = isMobile ? 3 : 5
+
+    // Always show first page
+    if (currentPage > 2) {
+      buttons.push(
+        <Button
+          key="first"
+          variant="outline"
+          size="sm"
+          className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8 w-8 p-0"
+          onClick={() => goToPage(1)}
+        >
+          1
+        </Button>,
+      )
+
+      // Show ellipsis if needed
+      if (currentPage > 3) {
+        buttons.push(
+          <Button
+            key="ellipsis-start"
+            variant="outline"
+            size="sm"
+            className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8 w-8 p-0 cursor-default"
+            disabled
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>,
+        )
+      }
+    }
+
+    // Calculate range of pages to show
+    let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2))
+    const endPage = Math.min(totalPages, startPage + maxButtonsToShow - 1)
+
+    // Adjust if we're near the end
+    if (endPage - startPage + 1 < maxButtonsToShow) {
+      startPage = Math.max(1, endPage - maxButtonsToShow + 1)
+    }
+
+    // Generate page buttons
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(
+        <Button
+          key={i}
+          variant={currentPage === i ? "default" : "outline"}
+          size="sm"
+          className={cn(
+            "h-8 w-8 p-0",
+            currentPage === i
+              ? "bg-purple-600 hover:bg-purple-700 text-white"
+              : "border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300",
+          )}
+          onClick={() => goToPage(i)}
+        >
+          {i}
+        </Button>,
+      )
+    }
+
+    // Show ellipsis if needed
+    if (endPage < totalPages - 1) {
+      buttons.push(
+        <Button
+          key="ellipsis-end"
+          variant="outline"
+          size="sm"
+          className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8 w-8 p-0 cursor-default"
+          disabled
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>,
+      )
+    }
+
+    // Always show last page if not already included
+    if (endPage < totalPages) {
+      buttons.push(
+        <Button
+          key="last"
+          variant="outline"
+          size="sm"
+          className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8 w-8 p-0"
+          onClick={() => goToPage(totalPages)}
+        >
+          {totalPages}
+        </Button>,
+      )
+    }
+
+    return buttons
   }
 
   // Loading skeleton
@@ -343,85 +458,114 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
               )}
             </div>
           ) : (
-            processedTransactions.map((tx) => (
-              <motion.div
-                key={tx.signature}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-                className="p-4"
-              >
-                <div
-                  className="rounded-lg bg-gray-800/30 p-4 border border-gray-800 hover:border-gray-700 transition-all cursor-pointer"
-                  onClick={() => toggleExpandTx(tx.signature)}
+            <>
+              {currentTransactions.map((tx) => (
+                <motion.div
+                  key={tx.signature}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="p-4"
                 >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-2">
-                      {getTransactionDirection(tx) === "in" ? (
-                        <div className="bg-green-500/10 p-1.5 rounded-full">
-                          <ArrowDownLeft className="w-4 h-4 text-green-400" />
-                        </div>
-                      ) : (
-                        <div className="bg-red-500/10 p-1.5 rounded-full">
-                          <ArrowUpRight className="w-4 h-4 text-red-400" />
-                        </div>
-                      )}
-                      <span className="font-medium text-white">{tx.type}</span>
-                    </div>
-                    {getStatusBadge(tx)}
-                  </div>
-
-                  <p className="text-sm text-gray-300 mb-3 line-clamp-2">{tx.description}</p>
-
-                  <div className="flex justify-between text-xs text-gray-400">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      {formatDate(tx.timestamp)}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                      <span>{(tx.fee / 1000000000).toFixed(6)} SOL</span>
-                    </div>
-                  </div>
-
-                  <AnimatePresence>
-                    {expandedTx === tx.signature && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="mt-4 pt-4 border-t border-gray-700/50 text-sm grid gap-3"
-                      >
-                        <div>
-                          <p className="text-gray-400 mb-1">Signature:</p>
-                          <p className="font-mono text-white break-all text-xs">{tx.signature}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400 mb-1">Sender:</p>
-                          <p className="font-mono text-white break-all text-xs">{tx.sender}</p>
-                        </div>
-                        <div className="flex justify-between">
-                          <div>
-                            <p className="text-gray-400 mb-1">Full Fee:</p>
-                            <p className="text-white">{(tx.fee / 1000000000).toFixed(9)} SOL</p>
+                  <div
+                    className="rounded-lg bg-gray-800/30 p-4 border border-gray-800 hover:border-gray-700 transition-all cursor-pointer"
+                    onClick={() => toggleExpandTx(tx.signature)}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        {getTransactionDirection(tx) === "in" ? (
+                          <div className="bg-green-500/10 p-1.5 rounded-full">
+                            <ArrowDownLeft className="w-4 h-4 text-green-400" />
                           </div>
-                          <Link
-                            href={`https://solscan.io/tx/${tx.signature}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-blue-500/10 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded-md flex items-center gap-1 h-fit"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            View <ExternalLink className="w-3.5 h-3.5" />
-                          </Link>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                        ) : (
+                          <div className="bg-red-500/10 p-1.5 rounded-full">
+                            <ArrowUpRight className="w-4 h-4 text-red-400" />
+                          </div>
+                        )}
+                        <span className="font-medium text-white">{tx.type}</span>
+                      </div>
+                      {getStatusBadge(tx)}
+                    </div>
+
+                    <p className="text-sm text-gray-300 mb-3 line-clamp-2">{tx.description}</p>
+
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        {formatDate(tx.timestamp)}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                        <span>{(tx.fee / 1000000000).toFixed(6)} SOL</span>
+                      </div>
+                    </div>
+
+                    <AnimatePresence>
+                      {expandedTx === tx.signature && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="mt-4 pt-4 border-t border-gray-700/50 text-sm grid gap-3"
+                        >
+                          <div>
+                            <p className="text-gray-400 mb-1">Signature:</p>
+                            <p className="font-mono text-white break-all text-xs">{tx.signature}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 mb-1">Sender:</p>
+                            <p className="font-mono text-white break-all text-xs">{tx.sender}</p>
+                          </div>
+                          <div className="flex justify-between">
+                            <div>
+                              <p className="text-gray-400 mb-1">Full Fee:</p>
+                              <p className="text-white">{(tx.fee / 1000000000).toFixed(9)} SOL</p>
+                            </div>
+                            <Link
+                              href={`https://solscan.io/tx/${tx.signature}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-blue-500/10 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded-md flex items-center gap-1 h-fit"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              View <ExternalLink className="w-3.5 h-3.5" />
+                            </Link>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              ))}
+
+              {/* Mobile Pagination */}
+              {totalPages > 1 && (
+                <div className="p-4 flex justify-center items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8 w-8 p-0"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex items-center gap-1">{renderPaginationButtons()}</div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8 w-8 p-0"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              </motion.div>
-            ))
+              )}
+            </>
           )}
         </div>
       ) : (
@@ -490,7 +634,7 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
                   </TableCell>
                 </TableRow>
               ) : (
-                processedTransactions.map((tx) => (
+                currentTransactions.map((tx) => (
                   <React.Fragment key={tx.signature}>
                     <TableRow
                       className={cn(
@@ -556,13 +700,13 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
                     </TableRow>
                     <AnimatePresence>
                       {expandedTx === tx.signature && (
-                       <motion.tr
-                       className="bg-gray-800/20 border-gray-800"
-                       initial={{ opacity: 0 }}
-                       animate={{ opacity: 1 }}
-                       exit={{ opacity: 0 }}
-                       transition={{ duration: 0.3 }}
-                     >
+                        <motion.tr
+                          className="bg-gray-800/20 border-gray-800"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
                           <TableCell colSpan={5} className="p-4">
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
@@ -589,7 +733,7 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
                               </div>
                             </div>
                           </TableCell>
-                          </motion.tr>
+                        </motion.tr>
                       )}
                     </AnimatePresence>
                   </React.Fragment>
@@ -597,6 +741,44 @@ export function TransactionsTable({ transactions, walletAddress, isLoading = fal
               )}
             </TableBody>
           </Table>
+
+          {/* Desktop Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 flex justify-center items-center gap-2 border-t border-gray-800">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+
+              <div className="flex items-center gap-1 mx-2">{renderPaginationButtons()}</div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 bg-gray-900/50 hover:bg-gray-800 text-gray-300 h-8"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pagination Info */}
+      {processedTransactions.length > 0 && (
+        <div className="bg-gray-800/50 p-3 border-t border-gray-800 text-sm text-gray-400 text-center">
+          Showing {Math.min((currentPage - 1) * transactionsPerPage + 1, processedTransactions.length)} to{" "}
+          {Math.min(currentPage * transactionsPerPage, processedTransactions.length)} of {processedTransactions.length}{" "}
+          transactions
         </div>
       )}
     </div>
