@@ -115,7 +115,7 @@ export function Navbar() {
                       className="text-gray-400 hover:text-white hover:bg-gray-800 rounded-full"
                       asChild
                     >
-                      <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+                      <a href="https://github.com/ozimmortal" target="_blank" rel="noopener noreferrer">
                         <Github className="h-5 w-5" />
                       </a>
                     </Button>
